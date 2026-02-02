@@ -8,7 +8,10 @@ from datetime import datetime
 app = FastAPI(title="HRMS Lite API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://hrms-lite-rosy-one.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
