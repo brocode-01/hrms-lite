@@ -1,23 +1,24 @@
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from app.database import employee_collection, attendance_collection
 from app.schemas import EmployeeCreate, AttendanceCreate
 from app.models import employee_serializer, attendance_serializer
-from datetime import datetime
 
 app = FastAPI(title="HRMS Lite API")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:5173",
-        "https://hrms-lite-rosy-one.vercel.app"
+        "https://hrms-lite-rosy-one.vercel.app",
     ],
     allow_credentials=True,
-    allow_methods=["*"],   
-    allow_headers=["*"],   
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
+@app.get("/")
+def health_check():
+    return {"status": "HRMS backend running"}
 
 @app.post("/employees")
 async def add_employee(emp: EmployeeCreate):
@@ -46,30 +47,34 @@ async def delete_employee(emp_id: str):
         raise HTTPException(status_code=404, detail="Employee not found")
     return {"message": "Employee deleted"}
 
+
 @app.post("/attendance")
 async def mark_attendance(att: AttendanceCreate):
     if not await employee_collection.find_one({"employee_id": att.employee_id}):
         raise HTTPException(status_code=404, detail="Employee not found")
+
     if await attendance_collection.find_one({
         "employee_id": att.employee_id,
-        "date": att.date.isoformat()  
+        "date": att.date.isoformat()
     }):
         raise HTTPException(status_code=409, detail="Attendance already marked")
 
     attendance_data = {
         "employee_id": att.employee_id,
-        "date": att.date.isoformat(),  
+        "date": att.date.isoformat(),
         "status": att.status
     }
 
     await attendance_collection.insert_one(attendance_data)
     return {"message": "Attendance marked"}
+
 @app.get("/attendance/{employee_id}")
 async def get_attendance(employee_id: str):
     records = []
     async for att in attendance_collection.find({"employee_id": employee_id}):
         records.append(attendance_serializer(att))
     return records
+
 @app.put("/attendance")
 async def update_attendance(att: AttendanceCreate):
     result = await attendance_collection.update_one(
@@ -78,17 +83,11 @@ async def update_attendance(att: AttendanceCreate):
             "date": att.date.isoformat()
         },
         {
-            "$set": {
-                "status": att.status
-            }
+            "$set": {"status": att.status}
         }
     )
 
     if result.matched_count == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="Attendance record not found"
-        )
+        raise HTTPException(status_code=404, detail="Attendance record not found")
 
     return {"message": "Attendance updated successfully"}
-
